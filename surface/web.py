@@ -24,6 +24,7 @@ from artifacts_lib.schema import Locator as SchemaLocator
 from artifacts_lib.schema import LocatorStrategy, Signal, SignalType, Target
 from evidence_lib.logger import EvidenceLogger
 from evidence_lib.redaction import redact_type_params
+from safety.policy import SafetyPolicy
 from surface.aria import parse_aria_snapshot
 from surface.base import Action, ActionResult, ObservedElement, ObservedState, Surface
 from surface.locator_resolver import resolve_target
@@ -38,11 +39,13 @@ class WebSurface(Surface):
         base_url: str,
         screenshot_dir: Path | None = None,
         evidence_logger: EvidenceLogger | None = None,
+        safety_policy: SafetyPolicy | None = None,
     ):
         self.page = page
         self.base_url = base_url
         self.screenshot_dir = Path(screenshot_dir) if screenshot_dir else None
         self.evidence_logger = evidence_logger
+        self.safety_policy = safety_policy
         self._last_elements: dict[str, ObservedElement] = {}
         self._screenshot_seq = 0
 
@@ -136,6 +139,17 @@ class WebSurface(Surface):
         return result
 
     def _act(self, action: Action) -> ActionResult:
+        if self.safety_policy is not None:
+            decision = self.safety_policy.evaluate(
+                url=self._url_for_safety_check(action),
+                action_type=action.kind,
+                semantic_description=self._semantic_for_safety_check(action),
+                current_path=urlsplit(self.page.url).path,
+                confirmed=action.confirmed,
+            )
+            if not decision.allowed:
+                return ActionResult(success=False, error=decision.reason)
+
         if action.kind == ActionType.NAVIGATE:
             url = action.params["url"]
             full_url = url if url.startswith("http") else urljoin(self.base_url, url)
@@ -162,6 +176,22 @@ class WebSurface(Surface):
             return ActionResult(success=False, error=f"unsupported action kind: {action.kind}")
 
         return ActionResult(success=True, resolved_target=resolved_target, resolved_strategy=resolved_strategy)
+
+    def _url_for_safety_check(self, action: Action) -> str:
+        """The URL the allowlist should evaluate: the *destination* for navigate (that's how
+        an action would escape the allowed route set), the *current* page for everything else
+        (that's where the action actually happens)."""
+        if action.kind == ActionType.NAVIGATE:
+            url = action.params.get("url", "")
+            return url if url.startswith("http") else urljoin(self.base_url, url)
+        return self.page.url
+
+    def _semantic_for_safety_check(self, action: Action) -> str | None:
+        if action.target is not None:
+            return action.target.semantic_description
+        if action.ref is not None and action.ref in self._last_elements:
+            return self._last_elements[action.ref].name
+        return None
 
     def _resolve(self, action: Action):
         if action.kind not in _ACTIONABLE_KINDS:

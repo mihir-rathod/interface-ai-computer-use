@@ -10,11 +10,14 @@ Built against **MockBank**, a small local FastAPI app with a deliberately legacy
 take-home brief.
 
 > Status: MockBank (the target app), the artifact schema, the Surface abstraction (perceive/act
-> over Playwright), and the deterministic replay engine are built and tested end to end --
-> replay correctly handles the full success path, both business outcomes, all four recoverable
-> conditions (including reauthenticate-and-resume), and hard failures. The discovery agent,
-> safety module, and escalation handoff are not yet built. This README is filled in
-> incrementally as each phase lands -- see `/REPORT.md` for the design write-up once complete.
+> over Playwright), the deterministic replay engine, and the safety module (allowlist +
+> risk classifier, enforced inside Surface.act() itself) are built and tested end to end.
+> Replay correctly handles the full success path, both business outcomes, all four recoverable
+> conditions (including reauthenticate-and-resume), and hard failures; unsafe actions (out of
+> allowlist scope, or irreversible without explicit confirmation) are genuinely blocked at the
+> point of execution, not just flagged. The discovery agent and escalation handoff are not yet
+> built. This README is filled in incrementally as each phase lands -- see `/REPORT.md` for the
+> design write-up once complete.
 
 ## Setup
 

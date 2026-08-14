@@ -59,6 +59,7 @@ class Action:
     target: Target | None = None
     params: dict[str, Any] = field(default_factory=dict)
     actor: str = "system"  # "agent" | "replay" | "human" -- who/what is driving this action
+    confirmed: bool = False  # explicit approval for an irreversible action (safety/policy.py)
 
     def __post_init__(self) -> None:
         if self.kind != ActionType.NAVIGATE and self.ref is None and self.target is None:

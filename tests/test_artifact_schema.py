@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from artifacts_lib import Artifact
 from artifacts_lib.storage import load_artifact, save_artifact
 
-FIXTURE_PATH = Path(__file__).parent / "fixtures" / "mockbank_member_balance_lookup.json"
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "mockbank.member_balance_lookup.json"
 
 
 @pytest.fixture

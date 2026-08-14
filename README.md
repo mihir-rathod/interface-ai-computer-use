@@ -9,11 +9,12 @@ Built against **MockBank**, a small local FastAPI app with a deliberately legacy
 (nested tables, no test IDs, generic markup) standing in for a bank back-office system, per the
 take-home brief.
 
-> Status: MockBank (the target app), the artifact schema, and the Surface abstraction
-> (perceive/act over Playwright, driving MockBank's real accessibility tree) are built and
-> tested. The discovery agent, replay engine, safety module, and escalation handoff are not yet
-> built. This README is filled in incrementally as each phase lands -- see `/REPORT.md` for the
-> design write-up once complete.
+> Status: MockBank (the target app), the artifact schema, the Surface abstraction (perceive/act
+> over Playwright), and the deterministic replay engine are built and tested end to end --
+> replay correctly handles the full success path, both business outcomes, all four recoverable
+> conditions (including reauthenticate-and-resume), and hard failures. The discovery agent,
+> safety module, and escalation handoff are not yet built. This README is filled in
+> incrementally as each phase lands -- see `/REPORT.md` for the design write-up once complete.
 
 ## Setup
 

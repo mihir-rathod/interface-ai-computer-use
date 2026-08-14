@@ -151,7 +151,16 @@
     ],
     "recoverable": [
       { "signal": { "type": "text_present", "value": "Service temporarily unavailable" }, "action": "retry", "max_attempts": 3, "backoff_ms": 1000 },
-      { "signal": { "type": "dialog_present", "value": "Terms Updated" }, "action": "dismiss_and_continue" },
+      {
+        "signal": { "type": "dialog_present", "value": "Terms Updated" },
+        "action": "dismiss_and_continue",
+        "recovery_target": {
+          "semantic_description": "dismiss button on the Terms Updated modal",
+          "locators": [
+            { "strategy": "role", "value": "button[name='Dismiss']", "note": "Primary: accessible name from the visible button text." }
+          ]
+        }
+      },
       { "signal": { "type": "redirected_to", "value": "**/login" }, "action": "reauthenticate_and_resume" }
     ],
     "hard_failure_default": "stop_and_escalate"
@@ -160,6 +169,7 @@
     "risk_level": "read_only",
     "requires_confirmation": false
   },
+  "success_output_defaults": { "status": "found" },
   "provenance": {
     "discovered_by": "hand_written",
     "discovery_run_id": "fixture-phase3-schema-validation",

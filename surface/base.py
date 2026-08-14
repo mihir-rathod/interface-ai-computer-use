@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
-from artifacts_lib.schema import ActionType, LocatorStrategy, Target
+from artifacts_lib.schema import ActionType, LocatorStrategy, Signal, Target
 
 
 @dataclass
@@ -87,4 +87,12 @@ class Surface(ABC):
     def compute_target(self, ref: str) -> Target:
         """Portable locator fallback chain for a ref from the most recent perceive() call --
         used to turn a discovery action into something an artifact step can save."""
+        ...
+
+    @abstractmethod
+    def check_signal(self, signal: Signal) -> bool:
+        """Does the current state match this signal, right now? One mechanism for "is this
+        condition true" used for step/success checkpoints and for error_handling's
+        business_outcome/recoverable rules alike -- replay never touches Playwright (or any
+        other surface's underlying tech) directly, only this and act()."""
         ...

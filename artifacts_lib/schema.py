@@ -231,7 +231,13 @@ class RecoveryAction(str, Enum):
 class BusinessOutcomeRule(BaseModel):
     """A page state that is a legitimate answer, not a failure -- e.g. 'no such member'."""
     signal: Signal
-    outcome: str = Field(description="Should match a value in output_schema.properties.status.enum")
+    outcome: str = Field(description="Value written into output_field when this rule matches.")
+    output_field: str = Field(
+        default="status",
+        description="Which output_schema property receives `outcome`. Explicit rather than the "
+                     "replay engine hardcoding a 'status' field name -- keeps the engine generic "
+                     "across artifacts that name this field differently or have more than one.",
+    )
 
 
 class RecoverableRule(BaseModel):
@@ -240,11 +246,26 @@ class RecoverableRule(BaseModel):
     action: RecoveryAction
     max_attempts: int = 1
     backoff_ms: int = 0
+    recovery_target: Target | None = Field(
+        default=None,
+        description="Element to act on for the recovery itself -- e.g. a dialog's dismiss "
+                     "button. Required for dismiss_and_continue; unused (and must be absent) "
+                     "for retry/reauthenticate_and_resume, which don't target a specific element.",
+    )
 
     @model_validator(mode="after")
     def retry_bounds(self) -> "RecoverableRule":
         if self.action == RecoveryAction.RETRY and self.max_attempts < 1:
             raise ValueError("retry action requires max_attempts >= 1")
+        return self
+
+    @model_validator(mode="after")
+    def recovery_target_matches_action(self) -> "RecoverableRule":
+        needs_target = self.action == RecoveryAction.DISMISS_AND_CONTINUE
+        if needs_target and self.recovery_target is None:
+            raise ValueError("dismiss_and_continue requires recovery_target")
+        if not needs_target and self.recovery_target is not None:
+            raise ValueError(f"recovery action '{self.action}' does not use recovery_target")
         return self
 
 
@@ -314,6 +335,12 @@ class Artifact(BaseModel):
     error_handling: ErrorHandling
     safety: SafetyMeta
     provenance: Provenance
+    success_output_defaults: dict[str, str] = Field(
+        default_factory=dict,
+        description="Literal values merged into outputs when the run completes via "
+                     "success_checkpoint rather than a business outcome -- e.g. {'status': "
+                     "'found'}. Keeps the replay engine generic instead of hardcoding a field name.",
+    )
 
     @field_validator("capability_id")
     @classmethod
@@ -340,12 +367,16 @@ class Artifact(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def output_bindings_are_declared(self) -> "Artifact":
+    def output_fields_are_declared(self) -> "Artifact":
         bound = {s.output_binding for s in self.steps if s.output_binding}
+        bound |= {r.output_field for r in self.error_handling.business_outcomes}
+        bound |= set(self.success_output_defaults.keys())
         declared = set(self.output_schema.properties.keys())
         unknown = bound - declared
         if unknown:
             raise ValueError(
-                f"step output_binding(s) {sorted(unknown)} not declared in output_schema.properties"
+                f"output field(s) {sorted(unknown)} (from step output_binding, "
+                f"business_outcomes.output_field, or success_output_defaults) not declared in "
+                f"output_schema.properties"
             )
         return self

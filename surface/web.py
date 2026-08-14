@@ -13,14 +13,15 @@ the replay engine's job -- Surface doesn't know about output_schema at all.
 """
 from __future__ import annotations
 
+import fnmatch
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from playwright.sync_api import Page
 
 from artifacts_lib.schema import ActionType
 from artifacts_lib.schema import Locator as SchemaLocator
-from artifacts_lib.schema import LocatorStrategy, Target
+from artifacts_lib.schema import LocatorStrategy, Signal, SignalType, Target
 from evidence_lib.logger import EvidenceLogger
 from evidence_lib.redaction import redact_type_params
 from surface.aria import parse_aria_snapshot
@@ -90,6 +91,39 @@ class WebSurface(Surface):
                 note="Fallback: element id present at discovery time, not guaranteed stable across tenants.",
             ))
         return Target(semantic_description=element.name or element.role, locators=locators)
+
+    # ---- check_signal -------------------------------------------------------------------
+
+    def check_signal(self, signal: Signal) -> bool:
+        if signal.type in (SignalType.URL_MATCHES, SignalType.REDIRECTED_TO):
+            # Path only, not the full URL -- these signals mean "which page/route are we on",
+            # and matching the full URL is actively wrong: a redirect to "/login?next=/search"
+            # would spuriously satisfy a "**/search" checkpoint (the query string happens to end
+            # in "/search") while simultaneously failing to match a "**/login" signal (the full
+            # string ends in "/search", not "/login") -- exactly backwards on both counts.
+            path = urlsplit(self.page.url).path
+            return fnmatch.fnmatchcase(path, signal.value)
+        if signal.type == SignalType.TEXT_PRESENT:
+            return self.page.get_by_text(signal.value).count() > 0
+        if signal.type == SignalType.DIALOG_PRESENT:
+            return self.page.get_by_role("dialog", name=signal.value, exact=True).count() > 0
+
+        assert signal.target is not None  # enforced by Signal's own validator
+        resolved = resolve_target(self.page, signal.target)
+        if signal.type == SignalType.ELEMENT_VISIBLE:
+            return resolved is not None and resolved[0].is_visible()
+        if signal.type == SignalType.ELEMENT_HIDDEN:
+            return resolved is None or not resolved[0].is_visible()
+        if signal.type == SignalType.ELEMENT_VALUE_EQUALS:
+            if resolved is None:
+                return False
+            pw_locator, _ = resolved
+            try:
+                current = pw_locator.input_value()
+            except Exception:
+                current = pw_locator.inner_text()
+            return current.strip() == signal.value
+        return False
 
     # ---- act ------------------------------------------------------------------------------
 

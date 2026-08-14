@@ -13,7 +13,7 @@
         <tr>
           <td class="logo">MockBank <span class="ver">Core v3.2</span></td>
           <td align="right">
-            {% if request.cookies.get("mb_session") %}
+            {% if is_logged_in(request) %}
             <form method="post" action="/logout" class="logout-form">
               <button type="submit">Log Out</button>
             </form>

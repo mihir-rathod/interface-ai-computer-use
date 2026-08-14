@@ -43,6 +43,12 @@ def _get_session(request: Request) -> dict | None:
     return data.get_session(request.cookies.get(SESSION_COOKIE))
 
 
+# Exposed to templates so the header can show "Log Out" based on an actual live session,
+# not just cookie presence -- the cookie can outlive the server-side session (e.g. a
+# process restart clears in-memory SESSIONS but the browser keeps the stale cookie).
+templates.env.globals["is_logged_in"] = lambda request: _get_session(request) is not None
+
+
 async def apply_environmental(request: Request, session: dict) -> tuple[Response | None, bool]:
     """Consume the session's one-shot pending_sim flag, if any.
 

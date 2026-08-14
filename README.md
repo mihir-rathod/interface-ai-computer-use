@@ -5,7 +5,7 @@ A system that takes a natural-language goal, uses an LLM to accomplish it agains
 artifact deterministically -- without the LLM in the loop -- with structured error handling and a
 human escalation path.
 
-Built against **MockBank**, a small local Flask/FastAPI app with a deliberately legacy-flavored UI
+Built against **MockBank**, a small local FastAPI app with a deliberately legacy-flavored UI
 (nested tables, no test IDs, generic markup) standing in for a bank back-office system, per the
 take-home brief.
 
@@ -39,6 +39,10 @@ uv run uvicorn mockbank.app:app --port 8000
 
 (Not port 5000 -- macOS's AirPlay Receiver squats on it by default.)
 
+MockBank has one hardcoded operator login (no self-registration -- see "What's mocked, and why"
+below): username `operator`, password `bankdemo123`. Both are dummy values checked into
+`mockbank/data.py`; they are not secrets and grant access to nothing but this local mock app.
+
 ## Demo path
 
 _TODO (Phase 8): exact `discover` then `replay` commands once the CLI exists._
@@ -60,4 +64,11 @@ _TODO (Phase 8): exact `discover` then `replay` commands once the CLI exists._
 
 ## What's mocked, and why
 
-_TODO -- filled in as mocks are introduced (operator console UI, etc.)._
+- **No self-registration / sign-up.** MockBank stands in for the class of system
+  ASSIGNMENT_ORIGINAL.md Section 1 describes: "core banking screens, servicing tools, and admin
+  consoles" -- internal back-office software used by bank employees, not a customer-facing product.
+  Real systems like this provision accounts through IT/HR onboarding, not self-service sign-up, so a
+  register flow would be unrealistic rather than a missing feature. One hardcoded operator login
+  (`operator` / `bankdemo123`, both dummy values) stands in for that provisioning step. This also
+  keeps the login flow a single reusable `mockbank.login` capability with real credential handling
+  (Section 3.4: never persist real secrets) without building an unneeded user-management surface.

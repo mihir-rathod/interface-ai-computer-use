@@ -16,6 +16,16 @@ MOCK_PASSWORD = "bankdemo123"
 ENVIRONMENTAL_CONDITIONS = {"slow", "unavailable", "terms_modal", "expire_session"}
 
 
+SUB_ACCOUNT_TYPES = {"savings", "checking"}
+
+
+@dataclass
+class SubAccount:
+    account_type: str
+    balance: float
+    confirmation_number: str
+
+
 @dataclass
 class Member:
     member_id: str
@@ -24,6 +34,7 @@ class Member:
     checking_balance: float
     status: str
     restricted: bool = False
+    sub_accounts: list[SubAccount] = field(default_factory=list)
 
 
 MEMBERS: dict[str, Member] = {

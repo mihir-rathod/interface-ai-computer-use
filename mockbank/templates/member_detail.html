@@ -10,6 +10,21 @@
   <tr><td>Checking Balance</td><td id="checking-balance-value" aria-label="Checking Balance value">${{ "%.2f"|format(member.checking_balance) }}</td></tr>
   <tr><td>Account Status</td><td id="account-status-value" aria-label="Account Status value">{{ member.status }}</td></tr>
 </table>
+
+{% if member.sub_accounts %}
+<h3>Sub-Accounts</h3>
+<table class="tbl002" cellpadding="6" cellspacing="0" border="1">
+  <tr><th>Type</th><th>Balance</th><th>Confirmation #</th></tr>
+  {% for sub in member.sub_accounts %}
+  <tr>
+    <td>{{ sub.account_type|capitalize }}</td>
+    <td aria-label="Sub-account {{ sub.confirmation_number }} balance">${{ "%.2f"|format(sub.balance) }}</td>
+    <td>{{ sub.confirmation_number }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
 <p><a href="/member/{{ member.member_id }}/open-subaccount">Open Sub-Account</a></p>
 <p><a href="/search">Back to Search</a></p>
 {% endblock %}

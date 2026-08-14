@@ -304,6 +304,11 @@ async def open_subaccount_confirm_submit(request: Request, member_id: str, actio
         )
 
     confirmation_number = data.next_confirmation_number()
+    member.sub_accounts.append(data.SubAccount(
+        account_type=pending["account_type"],
+        balance=pending["initial_deposit"],
+        confirmation_number=confirmation_number,
+    ))
     return templates.TemplateResponse(
         request, "success.html",
         {

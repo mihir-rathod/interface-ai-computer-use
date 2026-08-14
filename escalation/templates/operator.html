@@ -3,32 +3,51 @@
 <head>
 <meta charset="utf-8">
 <title>Operator Console -- {{ session_id }}</title>
-{% if auto_refresh %}<meta http-equiv="refresh" content="2">{% endif %}
 <style>
-  body { font-family: monospace; max-width: 900px; margin: 24px auto; padding: 0 16px; }
-  .pill { padding: 2px 10px; border-radius: 4px; color: white; font-weight: bold; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 900px; margin: 24px auto; padding: 0 16px; color: #1a1a1a; line-height: 1.5;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  h2 { font-size: 15px; margin: 24px 0 8px; color: #444; }
+  .meta { color: #555; font-size: 14px; }
+  .meta code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 10px; color: white; font-weight: 600; font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase; }
   .pill.automation { background: #2a7a4a; }
-  .pill.paused { background: #b23; }
-  .pill.human_active { background: #b77400; }
-  table { border-collapse: collapse; width: 100%; margin-top: 8px; }
-  td, th { border: 1px solid #ccc; padding: 4px 8px; text-align: left; font-size: 13px; }
-  img { max-width: 100%; border: 1px solid #999; margin-top: 10px; }
-  form { margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
-  .reason { color: #b23; font-weight: bold; }
+  .pill.paused { background: #c0392b; }
+  .pill.human_active { background: #b7791e; }
+  .reason-box { background: #fdf1ef; border: 1px solid #f0c9c2; color: #8a2e20; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 4px; font-size: 13px; }
+  td, th { border: 1px solid #e2e2e2; padding: 5px 10px; text-align: left; }
+  th { background: #f7f7f7; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  img { max-width: 100%; border: 1px solid #ddd; border-radius: 6px; margin-top: 10px; display: block; }
+  .panel { border: 1px solid #e2e2e2; border-radius: 8px; padding: 14px 16px; margin: 12px 0; background: #fcfcfc; }
+  .panel label { display: block; font-size: 12px; color: #666; margin: 8px 0 3px; }
+  .panel input[type=text], .panel select { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+  .checkbox-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: #444; }
+  .checkbox-row input { width: auto; }
+  button { margin-top: 12px; padding: 8px 16px; border: none; border-radius: 5px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: #2a5adf; color: white; }
+  .btn-resume { background: #2a7a4a; color: white; }
+  .stale-banner { display: none; background: #eef4ff; border: 1px solid #b9cdfa; color: #1a3f9e; border-radius: 6px; padding: 8px 14px; margin-bottom: 12px; font-size: 13px; }
 </style>
 </head>
 <body>
+<div id="stale-banner" class="stale-banner">Session state changed -- <a href="#" onclick="location.reload(); return false;">click to refresh</a> (won't happen automatically while you're typing below)</div>
+
 <h1>Operator Console</h1>
-<p>Session: <code>{{ session_id }}</code> &middot; Mode: <span class="pill {{ mode }}">{{ mode }}</span></p>
-<p>Capability: {{ capability_id or "-" }} &middot; Goal: {{ goal or "-" }}</p>
-<p>URL: {{ url or "-" }}{% if step_id %} &middot; Step: {{ step_id }}{% endif %}</p>
-{% if pause_reason %}<p class="reason">Paused: {{ pause_reason }}</p>{% endif %}
+<p class="meta">Session <code>{{ session_id }}</code> &middot; <span class="pill {{ mode }}">{{ mode }}</span></p>
+<p class="meta">Capability: <strong>{{ capability_id or "-" }}</strong><br>Goal: {{ goal or "-" }}</p>
+<p class="meta">Current URL: <code>{{ url or "-" }}</code>{% if step_id %} &middot; Step: <code>{{ step_id }}</code>{% endif %}</p>
+{% if pause_reason %}<div class="reason-box"><strong>Paused:</strong> {{ pause_reason }}</div>{% endif %}
 
 {% if has_screenshot %}
 <img src="/operator/{{ session_id }}/screenshot" alt="current state">
 {% endif %}
 
-<h2>Elements</h2>
+<h2>Elements the automation can see</h2>
 <table>
 <tr><th>ref</th><th>role</th><th>name</th><th>value</th></tr>
 {% for el in elements %}
@@ -39,21 +58,57 @@
 </table>
 
 <h2>Perform an action manually</h2>
+<div class="panel">
 <form method="post" action="/operator/{{ session_id }}/act">
-  <select name="action_kind">
+  <label for="action_kind">Action</label>
+  <select id="action_kind" name="action_kind">
     <option value="click">click</option>
     <option value="type">type</option>
     <option value="select">select</option>
     <option value="extract">extract</option>
   </select>
-  ref: <input type="text" name="ref" required>
-  value: <input type="text" name="value">
-  <label><input type="checkbox" name="confirmed" value="true"> I confirm this action (required for irreversible steps)</label>
-  <button type="submit">Perform</button>
+  <label for="ref">Element ref (from the table above)</label>
+  <input type="text" id="ref" name="ref" placeholder="e.g. e5" required>
+  <label for="value">Value (for type / select)</label>
+  <input type="text" id="value" name="value">
+  <div class="checkbox-row">
+    <input type="checkbox" id="confirmed" name="confirmed" value="true">
+    <label for="confirmed" style="margin:0;">I confirm this action (required for irreversible steps)</label>
+  </div>
+  <button type="submit" class="btn-primary">Perform</button>
 </form>
+</div>
 
 <form method="post" action="/operator/{{ session_id }}/resume">
-  <button type="submit">Resume Automation</button>
+  <button type="submit" class="btn-resume">Resume Automation</button>
 </form>
+
+{% if auto_refresh %}
+<script>
+  // Polls a lightweight status endpoint instead of blindly reloading the whole page every
+  // couple of seconds -- a blind reload would also wipe out anything typed into the form
+  // above. Only reloads when something actually changed, and never while a form field has
+  // focus (shows a banner to refresh manually instead).
+  const initial = { mode: {{ mode | tojson }}, pauseReason: {{ pause_reason | tojson }}, elementCount: {{ element_count }} };
+  function isEditingForm() {
+    const el = document.activeElement;
+    return el && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA");
+  }
+  setInterval(async () => {
+    try {
+      const resp = await fetch("/operator/{{ session_id }}/status");
+      const data = await resp.json();
+      const changed = data.mode !== initial.mode || data.pause_reason !== initial.pauseReason || data.element_count !== initial.elementCount;
+      if (changed) {
+        if (isEditingForm()) {
+          document.getElementById("stale-banner").style.display = "block";
+        } else {
+          location.reload();
+        }
+      }
+    } catch (e) { /* server not reachable mid-refresh -- ignore, try again next tick */ }
+  }, 1500);
+</script>
+{% endif %}
 </body>
 </html>

@@ -40,7 +40,25 @@ async def operator_page(request: Request, session_id: str):
         "has_screenshot": bool(observed and observed.screenshot_path),
         "elements": observed.elements if observed else [],
         "auto_refresh": snap["mode"] != SessionMode.AUTOMATION.value,
+        "element_count": len(observed.elements) if observed else 0,
     })
+
+
+@app.get("/operator/{session_id}/status")
+async def operator_status(session_id: str):
+    """Polled by the page's own background check (see templates/operator.html) so it can
+    reload only when something actually changed, instead of a blind full-page refresh every
+    couple of seconds -- which would also blow away anything you were mid-typing into the
+    manual-action form."""
+    session = get_session(session_id)
+    if session is None:
+        return {"mode": None}
+    snap = session.snapshot()
+    return {
+        "mode": snap["mode"],
+        "pause_reason": snap["pause_reason"],
+        "element_count": len(snap["observed"].elements) if snap["observed"] else 0,
+    }
 
 
 @app.get("/operator/{session_id}/screenshot")

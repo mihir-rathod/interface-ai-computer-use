@@ -9,9 +9,11 @@ Built against **MockBank**, a small local FastAPI app with a deliberately legacy
 (nested tables, no test IDs, generic markup) standing in for a bank back-office system, per the
 take-home brief.
 
-> Status: MockBank (the target app) is built and working end-to-end. Discovery agent, artifact
-> schema, replay engine, safety, and escalation are not yet built. This README is filled in
-> incrementally as each phase lands -- see `/REPORT.md` for the design write-up once complete.
+> Status: MockBank (the target app), the artifact schema, and the Surface abstraction
+> (perceive/act over Playwright, driving MockBank's real accessibility tree) are built and
+> tested. The discovery agent, replay engine, safety module, and escalation handoff are not yet
+> built. This README is filled in incrementally as each phase lands -- see `/REPORT.md` for the
+> design write-up once complete.
 
 ## Setup
 
@@ -31,6 +33,10 @@ rate limits apply (see REPORT.md for why Gemini over Anthropic).
 | `pytest` | no | no |
 | `uv run python cli.py replay ...` | no | yes |
 | `uv run python cli.py discover ...` | yes | yes |
+
+("no" for MockBank means you don't need to start it yourself -- the WebSurface tests spin up a
+real MockBank instance in-process on an OS-assigned free port for the duration of the test
+session, and drive it with a real headless Chromium via Playwright.)
 
 Start MockBank in a separate terminal before `discover` or `replay`:
 
@@ -79,15 +85,19 @@ _TODO (Phase 8): exact `discover` then `replay` commands once the CLI exists._
 
 ```
 /mockbank        MockBank target app (FastAPI + Jinja2)
-/agent            LLM-driven discovery loop (perceive -> decide -> act)
+/surface          Surface abstraction: perceive()/act(), the aria-snapshot element-list parser,
+                   and the locator fallback-chain resolver. WebSurface (Playwright) is the only
+                   implementation; both discovery and replay drive a surface through this same
+                   interface (ASSIGNMENT_ORIGINAL.md 3.7's "seam").
+/agent            LLM-driven discovery loop (decides what to do; acts through a Surface)
 /artifacts_lib    Pydantic artifact schema, JSON storage, validation
-/replay           Deterministic replay executor, locator resolver, error classifier
+/replay           Deterministic replay executor, error classifier (acts through a Surface)
 /safety           Allowlist config, risk classifier
 /escalation       Session manager, operator console (human handoff)
-/evidence_lib     Structured JSONL logger, screenshot capture
+/evidence_lib     Structured JSONL logger, redaction -- wired into every Surface.act() call
 /artifacts        Saved capability artifact JSON files
 /evidence         Logs/artifacts from real discovery + replay runs (required deliverable)
-/tests            pytest -- schema validation, locator resolution, error classification
+/tests            pytest -- schema validation, surface/locator behavior, error classification
 ```
 
 ## What's mocked, and why

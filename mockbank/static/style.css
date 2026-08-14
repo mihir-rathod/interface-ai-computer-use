@@ -3,6 +3,7 @@ body { font-family: Verdana, Geneva, sans-serif; font-size: 13px; background: #d
 .hdr { background: #003366; color: #ffffff; }
 .logo { font-weight: bold; font-size: 16px; padding: 6px; }
 .ver { font-size: 10px; font-weight: normal; margin-left: 8px; color: #99ccff; }
+.logout-form { margin: 0; padding-right: 8px; }
 .content { padding: 10px; }
 table.tbl001, table.tbl002 { border-collapse: collapse; background: #f5f5f5; }
 table.tbl001 td, table.tbl002 td, table.tbl002 th { border: 1px solid #999999; padding: 4px 8px; }

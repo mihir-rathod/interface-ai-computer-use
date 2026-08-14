@@ -12,6 +12,13 @@
       <table cellpadding="4" cellspacing="0" border="0" width="100%">
         <tr>
           <td class="logo">MockBank <span class="ver">Core v3.2</span></td>
+          <td align="right">
+            {% if request.cookies.get("mb_session") %}
+            <form method="post" action="/logout" class="logout-form">
+              <button type="submit">Log Out</button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
       </table>
     </td>

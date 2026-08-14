@@ -15,9 +15,11 @@ import argparse
 import json
 import os
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+import uvicorn
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
@@ -26,6 +28,9 @@ from agent.gemini_client import GeminiClient
 from agent.loop import DiscoveryLoop
 from agent.recorder import build_artifact
 from artifacts_lib.storage import load_artifact_by_id, save_artifact
+from escalation.operator_console import app as operator_app
+from escalation.registry import register_session, unregister_session
+from escalation.session_manager import SessionManager
 from evidence_lib.logger import EvidenceLogger
 from replay.engine import ReplayEngine
 from replay.result import ReplayStatus
@@ -35,6 +40,21 @@ from surface.web import WebSurface
 
 REPO_ROOT = Path(__file__).resolve().parent
 EVIDENCE_ROOT = REPO_ROOT / "evidence"
+_operator_console_started = False
+
+
+def ensure_operator_console(port: int) -> None:
+    """Starts the operator console once per process, in a background thread. Only the
+    automation thread (the one running discover/replay, below) ever touches the live
+    Playwright page -- this thread only serves HTML and enqueues human-submitted intents via
+    SessionManager.request_action (see escalation/session_manager.py's module docstring)."""
+    global _operator_console_started
+    if _operator_console_started:
+        return
+    config = uvicorn.Config(operator_app, host="127.0.0.1", port=port, log_level="warning")
+    server = uvicorn.Server(config)
+    threading.Thread(target=server.run, daemon=True).start()
+    _operator_console_started = True
 
 
 def parse_params(pairs: list[str]) -> dict[str, str]:
@@ -78,6 +98,10 @@ def cmd_discover(args: argparse.Namespace) -> int:
     logger = EvidenceLogger(evidence_dir)
     safety_policy = build_safety_policy(args.base_url)
 
+    if not args.no_operator_console:
+        ensure_operator_console(args.operator_port)
+    session = None
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=not args.headed)
         page = browser.new_page()
@@ -86,11 +110,18 @@ def cmd_discover(args: argparse.Namespace) -> int:
         surface = WebSurface(page, base_url=args.base_url, screenshot_dir=evidence_dir / "screenshots", evidence_logger=logger, safety_policy=safety_policy)
         run_login(surface, args.username, args.password)
 
-        loop = DiscoveryLoop(surface, GeminiClient(), evidence_logger=logger, max_steps=args.max_steps, timeout_seconds=args.timeout)
+        if not args.no_operator_console:
+            session = SessionManager(evidence_dir.name, surface, evidence_dir, evidence_logger=logger, capability_id=spec.capability_id, goal=spec.goal)
+            register_session(session)
+            print(f"operator console (visit if this run pauses): http://127.0.0.1:{args.operator_port}/operator/{session.session_id}")
+
+        loop = DiscoveryLoop(surface, GeminiClient(), evidence_logger=logger, max_steps=args.max_steps, timeout_seconds=args.timeout, session_manager=session)
         result = loop.run(goal=spec.goal, parameters=params, start_path=spec.start_path)
+        if session is not None:
+            unregister_session(session.session_id)
         browser.close()
 
-    print(f"discovery stop_reason={result.stop_reason} steps={len(result.transcript)}")
+    print(f"discovery stop_reason={result.stop_reason} steps={len(result.transcript)}" + (" (escalated to operator)" if result.escalated else ""))
     if result.reasoning:
         print(f"reasoning: {result.reasoning}")
     if result.stop_reason != "finished":
@@ -121,6 +152,10 @@ def cmd_replay(args: argparse.Namespace) -> int:
     logger = EvidenceLogger(evidence_dir)
     safety_policy = build_safety_policy(args.base_url)
 
+    if not args.no_operator_console:
+        ensure_operator_console(args.operator_port)
+    session = None
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=not args.headed)
         page = browser.new_page()
@@ -129,8 +164,19 @@ def cmd_replay(args: argparse.Namespace) -> int:
         surface = WebSurface(page, base_url=args.base_url, screenshot_dir=evidence_dir / "screenshots", evidence_logger=logger, safety_policy=safety_policy)
         run_login(surface, args.username, args.password)
 
-        engine = ReplayEngine(surface, evidence_logger=logger, reauth_credentials={"username": args.username, "password": args.password})
+        if not args.no_operator_console:
+            session = SessionManager(evidence_dir.name, surface, evidence_dir, evidence_logger=logger, capability_id=args.capability, goal=None)
+            register_session(session)
+            print(f"operator console (visit if this run pauses): http://127.0.0.1:{args.operator_port}/operator/{session.session_id}")
+
+        engine = ReplayEngine(
+            surface, evidence_logger=logger,
+            reauth_credentials={"username": args.username, "password": args.password},
+            session_manager=session,
+        )
         result = engine.run(artifact, params)
+        if session is not None:
+            unregister_session(session.session_id)
         browser.close()
 
     print(f"status: {result.status.value}")
@@ -161,11 +207,15 @@ def main() -> int:
     discover_p.add_argument("--evidence-dir", default=None)
     discover_p.add_argument("--max-steps", type=int, default=25)
     discover_p.add_argument("--timeout", type=int, default=300)
+    discover_p.add_argument("--operator-port", type=int, default=8010)
+    discover_p.add_argument("--no-operator-console", action="store_true", help="disable escalation -- a stuck run just fails instead of pausing for a human")
     discover_p.set_defaults(func=cmd_discover)
 
     replay_p = sub.add_parser("replay", help="Deterministically replay a saved artifact -- no LLM")
     replay_p.add_argument("--capability", required=True, help="capability_id of a saved artifact under /artifacts/")
     replay_p.add_argument("--param", action="append", default=[], help="key=value, repeatable")
+    replay_p.add_argument("--operator-port", type=int, default=8010)
+    replay_p.add_argument("--no-operator-console", action="store_true", help="disable escalation -- a hard failure just fails instead of pausing for a human")
     replay_p.add_argument("--base-url", default=default_base_url)
     replay_p.add_argument("--username", default="operator")
     replay_p.add_argument("--password", default="bankdemo123")

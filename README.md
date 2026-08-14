@@ -11,9 +11,12 @@ take-home brief.
 
 > Status: the full vertical slice works end to end via `cli.py` -- goal -> real LLM-driven
 > discovery -> saved typed artifact -> deterministic replay (success, both business outcomes,
-> and recoverable conditions all verified against a live run, not just tests). Escalation/
-> handoff (human takeover of a live session) is not yet built. This README is filled in
-> incrementally as each phase lands -- see `/REPORT.md` for the design write-up once complete.
+> and recoverable conditions, all verified against a live run, not just tests) -> and now
+> escalation: a genuine hard failure pauses the run, hands the *same live browser session* to
+> a human through a bare operator console, and resumes once they've either fixed it manually or
+> approved an irreversible step -- verified end to end against a real MockBank run, not just
+> unit-level. This README is filled in incrementally as each phase lands -- see `/REPORT.md`
+> for the design write-up once complete.
 
 ## Setup
 
@@ -110,6 +113,17 @@ uv run python cli.py replay --capability mockbank.member_balance_lookup --param 
 ```
 
 Add `--headed` to either command to watch the browser instead of running headless.
+
+### Escalation / human handoff
+
+Both commands print an operator console URL (`http://127.0.0.1:8010/operator/<run>`) at
+startup. If the run hits something it can't resolve on its own -- a broken locator, an
+irreversible step needing confirmation, discovery getting stuck -- it pauses and hands the
+*live* browser session to that page: the same screenshot and element list the automation was
+seeing, a form to perform an action manually (by element ref, with a confirm checkbox for
+irreversible steps), and a Resume button. The run is genuinely blocked waiting on that page, not
+polling -- visit the URL while a run is paused to see it live. Pass `--no-operator-console` to
+disable this and have a stuck run just fail immediately instead.
 
 ## Repo layout
 

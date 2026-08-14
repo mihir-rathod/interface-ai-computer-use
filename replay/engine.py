@@ -20,6 +20,7 @@ from typing import Any
 
 from artifacts_lib.schema import ActionType, Artifact, RecoverableRule, RecoveryAction, Step
 from artifacts_lib.storage import DEFAULT_ARTIFACTS_DIR, load_artifact_by_id
+from escalation.session_manager import SessionManager
 from evidence_lib.logger import EvidenceLogger
 from replay.coercion import coerce_output
 from replay.result import ReplayError, ReplayResult, ReplayStatus
@@ -56,11 +57,16 @@ class ReplayEngine:
         evidence_logger: EvidenceLogger | None = None,
         artifacts_dir: Any = DEFAULT_ARTIFACTS_DIR,
         reauth_credentials: dict[str, str] | None = None,
+        session_manager: SessionManager | None = None,
     ):
         self.surface = surface
         self.evidence_logger = evidence_logger
         self.artifacts_dir = artifacts_dir
         self.reauth_credentials = reauth_credentials
+        # On a failure with no known business/recoverable signal, this is what pauses for a
+        # human instead of failing immediately -- exactly once per step (see
+        # _run_step_with_recovery's depth==0 guard), ASSIGNMENT_ORIGINAL.md 3.6.
+        self.session_manager = session_manager
 
     def run(self, artifact: Artifact, inputs: dict[str, Any]) -> ReplayResult:
         started_at = datetime.now(timezone.utc)
@@ -129,6 +135,12 @@ class ReplayEngine:
         if not self.surface.check_signal(substitute_signal(artifact.success_checkpoint, variables)):
             outcome = self._classify(artifact, variables)
             if outcome is None:
+                if self.session_manager is not None:
+                    self.session_manager.update_observed(self.surface.perceive())
+                    self.session_manager.pause(reason="all steps completed but success_checkpoint was not met", step_id=None)
+                    if not self.surface.check_signal(substitute_signal(artifact.success_checkpoint, variables)):
+                        raise _HardFailure(ReplayError(message="success_checkpoint still not met after human intervention"), completed)
+                    return completed, outputs
                 raise _HardFailure(ReplayError(
                     message="all steps completed but success_checkpoint was not met",
                 ), completed)
@@ -165,10 +177,36 @@ class ReplayEngine:
         if checkpoint_ok:
             return result.extracted_value
 
-        raise _HardFailure(ReplayError(
-            step_id=step.step_id,
-            message=result.error or "checkpoint failed and no known business/recoverable signal matched",
-        ), completed_so_far)
+        failure_message = result.error or "checkpoint failed and no known business/recoverable signal matched"
+
+        # Escalate to a human exactly once per step: depth==0 means this is the first time
+        # we've hit this specific failure (not a retry after a resume that failed again).
+        # Covers both a genuine unmatched failure AND a safety block (e.g. an irreversible
+        # action needing confirmation) -- either way, the human can act on the SAME live
+        # session (including performing the exact blocked action with the confirmed checkbox)
+        # via the operator console, then resume.
+        if self.session_manager is not None and depth == 0:
+            self.session_manager.update_observed(self.surface.perceive())
+            self.session_manager.pause(reason=failure_message, step_id=step.step_id)
+
+            # Don't blindly redo the original action on resume -- the human may already have
+            # performed it manually (or something equivalent) via the operator console. Check
+            # first, so a successful manual action isn't silently repeated (a second click on
+            # a non-idempotent step would be a real double-submit, not just a wasted retry).
+            post_outcome = self._classify(artifact, variables)
+            if post_outcome is not None:
+                self._handle_classified(artifact, post_outcome, step, variables, completed_so_far, non_idempotent_done)
+                return self._run_step_with_recovery(artifact, step, variables, completed_so_far, non_idempotent_done, depth + 1)
+            already_satisfied = (
+                step.action != ActionType.EXTRACT
+                and step.checkpoint is not None
+                and self.surface.check_signal(substitute_signal(step.checkpoint, variables))
+            )
+            if already_satisfied:
+                return None
+            return self._run_step_with_recovery(artifact, step, variables, completed_so_far, non_idempotent_done, depth + 1)
+
+        raise _HardFailure(ReplayError(step_id=step.step_id, message=failure_message), completed_so_far)
 
     def _handle_classified(self, artifact, outcome, step, variables, completed_so_far, non_idempotent_done) -> None:
         kind, payload = outcome

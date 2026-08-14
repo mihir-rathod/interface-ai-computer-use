@@ -23,6 +23,7 @@ from google.genai import types
 from agent.gemini_client import GeminiClient
 from agent.tools import ALL_TOOLS, ToolCall, is_terminal, to_action
 from artifacts_lib.schema import ActionType
+from escalation.session_manager import SessionManager
 from evidence_lib.logger import EvidenceLogger
 from surface.base import Action, ActionResult, ObservedState, Surface
 
@@ -31,6 +32,9 @@ DEFAULT_TIMEOUT_SECONDS = 300
 DEAD_END_THRESHOLD = 3
 
 StopReason = Literal["finished", "give_up", "max_steps", "timeout", "dead_end", "error"]
+# Stop reasons that mean "the model is stuck," not "the model is done" -- these are what
+# escalate to a human (ASSIGNMENT_ORIGINAL.md 3.6) rather than just ending the run.
+_STUCK_REASONS = {"give_up", "dead_end", "max_steps", "timeout"}
 
 SYSTEM_INSTRUCTION = (
     "You are an automation agent operating a web application through a structured element "
@@ -57,6 +61,7 @@ class DiscoveryResult:
     stop_reason: StopReason
     reasoning: str | None
     transcript: list[RecordedAction] = field(default_factory=list)
+    escalated: bool = False
 
 
 class DiscoveryLoop:
@@ -67,12 +72,17 @@ class DiscoveryLoop:
         evidence_logger: EvidenceLogger | None = None,
         max_steps: int = DEFAULT_MAX_STEPS,
         timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+        session_manager: SessionManager | None = None,
     ):
         self.surface = surface
         self.gemini_client = gemini_client
         self.evidence_logger = evidence_logger
         self.max_steps = max_steps
         self.timeout_seconds = timeout_seconds
+        # On a "stuck" stop reason (give_up/dead_end/max_steps/timeout -- see _STUCK_REASONS),
+        # this is what pauses and hands the live session to a human before the run ends,
+        # instead of just returning a failed DiscoveryResult (ASSIGNMENT_ORIGINAL.md 3.6).
+        self.session_manager = session_manager
 
     def run(self, goal: str, parameters: dict[str, str], start_path: str | None = None) -> DiscoveryResult:
         """`start_path`, if given, is navigated to explicitly *before* the model takes over --
@@ -156,7 +166,15 @@ class DiscoveryLoop:
             transcript[-1].observed_after = self.surface.perceive(actor="agent")
         if self.evidence_logger is not None:
             self.evidence_logger.log("agent", "discovery_result", stop_reason=stop_reason, reasoning=reasoning, step_count=len(transcript))
-        return DiscoveryResult(stop_reason=stop_reason, reasoning=reasoning, transcript=transcript)
+
+        escalated = False
+        if self.session_manager is not None and stop_reason in _STUCK_REASONS:
+            if self.session_manager.latest_observed is None:
+                self.session_manager.update_observed(self.surface.perceive(actor="agent"))
+            self.session_manager.pause(reason=f"discovery stuck: {stop_reason} -- {reasoning or 'no reasoning given'}")
+            escalated = True
+
+        return DiscoveryResult(stop_reason=stop_reason, reasoning=reasoning, transcript=transcript, escalated=escalated)
 
     def _initial_prompt(self, goal: str, parameters: dict[str, str]) -> str:
         param_lines = "\n".join(f"- {k} = {v!r}" for k, v in parameters.items()) or "(none)"

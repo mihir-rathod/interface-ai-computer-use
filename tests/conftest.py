@@ -14,8 +14,14 @@ import time
 import httpx
 import pytest
 import uvicorn
+from dotenv import load_dotenv
 
 from mockbank.app import app as mockbank_app
+
+# So GEMINI_API_KEY (and anything else in .env) is visible the same way for `pytest` as for
+# the `discover`/`replay` CLI -- without this, tests/test_discovery_live.py would always
+# skip even with a real key sitting in .env, since pytest doesn't load it on its own.
+load_dotenv()
 
 
 def _free_port() -> int:

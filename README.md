@@ -10,14 +10,14 @@ Built against **MockBank**, a small local FastAPI app with a deliberately legacy
 take-home brief.
 
 > Status: MockBank (the target app), the artifact schema, the Surface abstraction (perceive/act
-> over Playwright), the deterministic replay engine, and the safety module (allowlist +
-> risk classifier, enforced inside Surface.act() itself) are built and tested end to end.
-> Replay correctly handles the full success path, both business outcomes, all four recoverable
-> conditions (including reauthenticate-and-resume), and hard failures; unsafe actions (out of
-> allowlist scope, or irreversible without explicit confirmation) are genuinely blocked at the
-> point of execution, not just flagged. The discovery agent and escalation handoff are not yet
-> built. This README is filled in incrementally as each phase lands -- see `/REPORT.md` for the
-> design write-up once complete.
+> over Playwright), the deterministic replay engine, the safety module (allowlist + risk
+> classifier, enforced inside Surface.act() itself), and the LLM-driven discovery agent
+> (Gemini tool-calling against the Surface, recording a real run into an artifact) are built
+> and tested end to end -- including a genuine live discovery run that finds a member's
+> balance with no hardcoded steps, and replays the artifact it produced with a *different*
+> input than the one used during discovery. Escalation/handoff is not yet built. This README
+> is filled in incrementally as each phase lands -- see `/REPORT.md` for the design write-up
+> once complete.
 
 ## Setup
 
@@ -34,9 +34,14 @@ rate limits apply (see REPORT.md for why Gemini over Anthropic).
 
 | Command | Needs `GEMINI_API_KEY` | Needs MockBank running |
 |---|---|---|
-| `pytest` | no | no |
+| `pytest` | no (see note) | no |
 | `uv run python cli.py replay ...` | no | yes |
 | `uv run python cli.py discover ...` | yes | yes |
+
+One test (`tests/test_discovery_live.py`) makes a real Gemini call to prove the discovery loop
+genuinely works end to end -- ASSIGNMENT_ORIGINAL.md Section 4's non-negotiable "the discovery
+run has to be real." It's the only test that isn't free/local, so it auto-skips (not fails)
+whenever `GEMINI_API_KEY` isn't set -- the other 72 tests are unaffected either way.
 
 ("no" for MockBank means you don't need to start it yourself -- the WebSurface tests spin up a
 real MockBank instance in-process on an OS-assigned free port for the duration of the test

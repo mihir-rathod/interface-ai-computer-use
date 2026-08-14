@@ -34,8 +34,10 @@ rate limits apply (see REPORT.md for why Gemini over Anthropic).
 Start MockBank in a separate terminal before `discover` or `replay`:
 
 ```bash
-uv run uvicorn mockbank.app:app --port 5000
+uv run uvicorn mockbank.app:app --port 8000
 ```
+
+(Not port 5000 -- macOS's AirPlay Receiver squats on it by default.)
 
 ## Demo path
 

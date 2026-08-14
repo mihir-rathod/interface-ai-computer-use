@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Account Opened{% endblock %}
+{% block content %}
+<h2>Account Opened</h2>
+<p>New {{ pending.account_type }} sub-account opened for {{ member.name }} ({{ member.member_id }}).</p>
+<p>Confirmation Number: <span id="confirmation-number" aria-label="Confirmation Number value">{{ confirmation_number }}</span></p>
+<p><a href="/member/{{ member.member_id }}">Back to Member</a></p>
+{% endblock %}

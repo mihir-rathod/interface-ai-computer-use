@@ -1,0 +1,10 @@
+<div role="dialog" aria-label="Terms Updated" class="modal-overlay">
+  <div class="modal-box">
+    <h3>Terms Updated</h3>
+    <p>Our terms of service have been updated. Please review and dismiss to continue.</p>
+    <form method="post" action="/dismiss-modal">
+      <input type="hidden" name="return_to" value="{{ modal_return_to }}">
+      <button type="submit">Dismiss</button>
+    </form>
+  </div>
+</div>

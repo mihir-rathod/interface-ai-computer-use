@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Log In{% endblock %}
+{% block content %}
+<form method="post" action="/login">
+<input type="hidden" name="next" value="{{ next }}">
+<table class="tbl001" cellpadding="6" cellspacing="0" border="1">
+  <tr><td colspan="2" class="section-hdr"><h1>Operator Log In</h1></td></tr>
+  <tr>
+    <td><label for="username">Username</label></td>
+    <td><input type="text" id="username" name="username" /></td>
+  </tr>
+  <tr>
+    <td><label for="password">Password</label></td>
+    <td><input type="password" id="password" name="password" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="right"><button type="submit">Log In</button></td>
+  </tr>
+</table>
+</form>
+{% if error %}
+<p class="err-msg">{{ error }}</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,68 @@
+"""In-memory fixtures and session state for MockBank.
+
+Everything here is intentionally fake: no real member data, no real credentials.
+State lives in process memory and resets on restart -- fine for a local demo target.
+"""
+from __future__ import annotations
+
+import secrets
+from dataclasses import dataclass, field
+
+# Dummy operator credential for this mock app only -- not a real secret, never used
+# against a real system. See ASSIGNMENT_ORIGINAL.md ground rules: "never use real credentials".
+MOCK_USERNAME = "operator"
+MOCK_PASSWORD = "bankdemo123"
+
+ENVIRONMENTAL_CONDITIONS = {"slow", "unavailable", "terms_modal", "expire_session"}
+
+
+@dataclass
+class Member:
+    member_id: str
+    name: str
+    savings_balance: float
+    checking_balance: float
+    status: str
+    restricted: bool = False
+
+
+MEMBERS: dict[str, Member] = {
+    "10001": Member("10001", "Alice Johnson", 4231.55, 812.10, "Active"),
+    "10002": Member("10002", "Bob Smith", 150.00, 20.00, "Active"),
+    "10003": Member("10003", "Carol Lee", 98212.40, 5000.00, "Active"),
+    # Reserved id used to demonstrate the permission-denied business outcome.
+    "40004": Member("40004", "Restricted Member", 0.0, 0.0, "Restricted", restricted=True),
+}
+
+# session_id -> session state. "pending_sim" is a one-shot environmental condition
+# armed via GET /_debug/simulate and consumed by the very next request.
+SESSIONS: dict[str, dict] = {}
+
+_confirmation_counter = 100000
+
+
+def create_session(username: str) -> str:
+    session_id = secrets.token_urlsafe(16)
+    SESSIONS[session_id] = {
+        "username": username,
+        "pending_sim": None,
+        "pending_subaccount": None,
+    }
+    return session_id
+
+
+def get_session(session_id: str | None) -> dict | None:
+    if not session_id:
+        return None
+    return SESSIONS.get(session_id)
+
+
+def destroy_session(session_id: str | None) -> None:
+    if session_id and session_id in SESSIONS:
+        del SESSIONS[session_id]
+
+
+def next_confirmation_number() -> str:
+    global _confirmation_counter
+    _confirmation_counter += 1
+    return f"CNF-{_confirmation_counter}"

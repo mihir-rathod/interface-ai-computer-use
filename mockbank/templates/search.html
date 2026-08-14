@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Member Search{% endblock %}
+{% block content %}
+<form method="post" action="/search">
+<table class="tbl001" cellpadding="6" cellspacing="0" border="1">
+  <tr><td colspan="2" class="section-hdr"><h1>Member Search</h1></td></tr>
+  <tr>
+    <td><label for="member_id">Member ID</label></td>
+    <td><input type="text" id="member_id" name="member_id" value="{{ searched_id or '' }}" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="right"><button type="submit">Search</button></td>
+  </tr>
+</table>
+</form>
+{% if result_status == "not_found" %}
+<p class="err-msg">No member found matching ID {{ searched_id }}.</p>
+{% elif result_status == "permission_denied" %}
+<p class="err-msg">Access denied for member {{ searched_id }}.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Open Sub-Account{% endblock %}
+{% block content %}
+<h2>Open Sub-Account for {{ member.name }} ({{ member.member_id }})</h2>
+<form method="post" action="/member/{{ member.member_id }}/open-subaccount">
+<table class="tbl001" cellpadding="6" cellspacing="0" border="1">
+  <tr>
+    <td><label for="account_type">Account Type</label></td>
+    <td>
+      <select id="account_type" name="account_type">
+        <option value="savings" {% if account_type == "savings" %}selected{% endif %}>Savings</option>
+        <option value="money_market" {% if account_type == "money_market" %}selected{% endif %}>Money Market</option>
+      </select>
+    </td>
+  </tr>
+  <tr>
+    <td><label for="initial_deposit">Initial Deposit Amount</label></td>
+    <td><input type="text" id="initial_deposit" name="initial_deposit" value="{{ initial_deposit }}" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="right"><button type="submit">Continue</button></td>
+  </tr>
+</table>
+</form>
+{% if error %}
+<p class="err-msg">{{ error }}</p>
+{% endif %}
+<p><a href="/member/{{ member.member_id }}">Cancel</a></p>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Member Detail{% endblock %}
+{% block content %}
+<h2>Account Summary</h2>
+<table class="tbl002" cellpadding="6" cellspacing="0" border="1">
+  <tr><th>Field</th><th>Value</th></tr>
+  <tr><td>Member Name</td><td>{{ member.name }}</td></tr>
+  <tr><td>Member ID</td><td>{{ member.member_id }}</td></tr>
+  <tr><td>Savings Balance</td><td id="savings-balance-value" aria-label="Savings Balance value">${{ "%.2f"|format(member.savings_balance) }}</td></tr>
+  <tr><td>Checking Balance</td><td id="checking-balance-value" aria-label="Checking Balance value">${{ "%.2f"|format(member.checking_balance) }}</td></tr>
+  <tr><td>Account Status</td><td id="account-status-value" aria-label="Account Status value">{{ member.status }}</td></tr>
+</table>
+<p><a href="/member/{{ member.member_id }}/open-subaccount">Open Sub-Account</a></p>
+<p><a href="/search">Back to Search</a></p>
+{% endblock %}

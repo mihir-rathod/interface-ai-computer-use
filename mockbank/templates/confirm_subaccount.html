@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Confirm Sub-Account{% endblock %}
+{% block content %}
+<h2>Confirm New Sub-Account</h2>
+<table class="tbl002" cellpadding="6" cellspacing="0" border="1">
+  <tr><th>Field</th><th>Value</th></tr>
+  <tr><td>Member</td><td>{{ member.name }} ({{ member.member_id }})</td></tr>
+  <tr><td>Account Type</td><td>{{ pending.account_type }}</td></tr>
+  <tr><td>Initial Deposit</td><td>${{ "%.2f"|format(pending.initial_deposit) }}</td></tr>
+</table>
+<form method="post" action="/member/{{ member.member_id }}/open-subaccount/confirm">
+  <input type="hidden" name="action" value="confirm">
+  <button type="submit">Confirm &amp; Open Account</button>
+</form>
+<form method="post" action="/member/{{ member.member_id }}/open-subaccount/confirm">
+  <input type="hidden" name="action" value="cancel">
+  <button type="submit">Cancel</button>
+</form>
+{% endblock %}

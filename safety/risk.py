@@ -17,7 +17,18 @@ _ALWAYS_SAFE_ACTIONS = {ActionType.EXTRACT, ActionType.NAVIGATE, ActionType.WAIT
 # not a NAVIGATE, so it isn't caught by _ALWAYS_SAFE_ACTIONS above. Including that phrase here
 # would misclassify a harmless navigation as irreversible. "confirm" alone already correctly
 # catches the actual irreversible step -- MockBank's "Confirm & Open Account" button.
-_RISK_KEYWORDS = ("confirm", "submit", "delete", "remove", "transfer", "withdraw", "close account")
+#
+# Deliberately does NOT include "submit" -- found via a real false positive: a hand-written
+# fixture's Target.semantic_description read "login submit button" (a human-authored
+# description, not the element's actual accessible name, which is just "Log In"), and that got
+# the login button blocked as irreversible. "submit" is generic enough to show up in
+# descriptive text without meaning "this changes state" -- none of MockBank's actual button
+# labels ("Log In", "Search", "Continue", "Confirm & Open Account") contain it, so dropping it
+# loses no real detection here. The fixtures were also fixed to describe elements by their
+# accessible name, matching the convention WebSurface.compute_target() already uses for
+# LLM-discovered artifacts, precisely so semantic_description stays a reliable classification
+# signal rather than free-text prose.
+_RISK_KEYWORDS = ("confirm", "delete", "remove", "transfer", "withdraw", "close account")
 
 
 class RiskClassifier:

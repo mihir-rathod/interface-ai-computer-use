@@ -84,7 +84,7 @@
       "step_id": "s3",
       "action": "click",
       "target": {
-        "semantic_description": "Search submit button",
+        "semantic_description": "Search",
         "locators": [
           { "strategy": "role", "value": "button[name='Search']", "note": "Primary: accessible name from visible button text." },
           { "strategy": "text", "value": "Search", "note": "Last resort: purely text-based, most brittle." }

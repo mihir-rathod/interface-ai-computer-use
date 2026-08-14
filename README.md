@@ -9,15 +9,11 @@ Built against **MockBank**, a small local FastAPI app with a deliberately legacy
 (nested tables, no test IDs, generic markup) standing in for a bank back-office system, per the
 take-home brief.
 
-> Status: MockBank (the target app), the artifact schema, the Surface abstraction (perceive/act
-> over Playwright), the deterministic replay engine, the safety module (allowlist + risk
-> classifier, enforced inside Surface.act() itself), and the LLM-driven discovery agent
-> (Gemini tool-calling against the Surface, recording a real run into an artifact) are built
-> and tested end to end -- including a genuine live discovery run that finds a member's
-> balance with no hardcoded steps, and replays the artifact it produced with a *different*
-> input than the one used during discovery. Escalation/handoff is not yet built. This README
-> is filled in incrementally as each phase lands -- see `/REPORT.md` for the design write-up
-> once complete.
+> Status: the full vertical slice works end to end via `cli.py` -- goal -> real LLM-driven
+> discovery -> saved typed artifact -> deterministic replay (success, both business outcomes,
+> and recoverable conditions all verified against a live run, not just tests). Escalation/
+> handoff (human takeover of a live session) is not yet built. This README is filled in
+> incrementally as each phase lands -- see `/REPORT.md` for the design write-up once complete.
 
 ## Setup
 
@@ -88,7 +84,32 @@ request -- that's the one the condition fires on.
 
 ## Demo path
 
-_TODO (Phase 8): exact `discover` then `replay` commands once the CLI exists._
+With MockBank running (see above) and `GEMINI_API_KEY` set in `.env`:
+
+```bash
+# Discovery: a real Gemini-driven run that figures out how to look up a member's balance,
+# with no hardcoded steps, then saves the result as a typed, reusable artifact.
+uv run python cli.py discover --capability mockbank.member_balance_lookup --param member_id=10001
+
+# Replay: deterministic, no LLM call, using a DIFFERENT member id than discovery used --
+# proves the artifact genuinely generalized rather than replaying a hardcoded value.
+uv run python cli.py replay --capability mockbank.member_balance_lookup --param member_id=10002
+```
+
+Both commands log in first (username/password default to the demo credentials above; override
+with `--username`/`--password`), print a structured result, and write evidence -- a JSONL log of
+every perceive/act plus screenshots -- to `/evidence/<run>/`. `discover` also saves the artifact
+itself to `/artifacts/<capability_id>.json`.
+
+To see a replay hit a business outcome instead of success (`replay` never needs
+`GEMINI_API_KEY`):
+
+```bash
+uv run python cli.py replay --capability mockbank.member_balance_lookup --param member_id=99999    # not_found
+uv run python cli.py replay --capability mockbank.member_balance_lookup --param member_id=40004    # permission_denied
+```
+
+Add `--headed` to either command to watch the browser instead of running headless.
 
 ## Repo layout
 
@@ -98,7 +119,9 @@ _TODO (Phase 8): exact `discover` then `replay` commands once the CLI exists._
                    and the locator fallback-chain resolver. WebSurface (Playwright) is the only
                    implementation; both discovery and replay drive a surface through this same
                    interface (ASSIGNMENT_ORIGINAL.md 3.7's "seam").
-/agent            LLM-driven discovery loop (decides what to do; acts through a Surface)
+/agent            LLM-driven discovery loop (decides what to do; acts through a Surface),
+                   the Gemini client, and the capability catalog (agent/catalog.py -- the
+                   human-authored contract each discovery run fills in)
 /artifacts_lib    Pydantic artifact schema, JSON storage, validation
 /replay           Deterministic replay executor, error classifier (acts through a Surface)
 /safety           Allowlist config, risk classifier
@@ -107,6 +130,7 @@ _TODO (Phase 8): exact `discover` then `replay` commands once the CLI exists._
 /artifacts        Saved capability artifact JSON files
 /evidence         Logs/artifacts from real discovery + replay runs (required deliverable)
 /tests            pytest -- schema validation, surface/locator behavior, error classification
+cli.py            `discover` and `replay` commands -- see Demo path above
 ```
 
 ## What's mocked, and why

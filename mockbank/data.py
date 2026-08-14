@@ -6,6 +6,7 @@ State lives in process memory and resets on restart -- fine for a local demo tar
 from __future__ import annotations
 
 import secrets
+import time
 from dataclasses import dataclass, field
 
 # Dummy operator credential for this mock app only -- not a real secret, never used
@@ -49,7 +50,14 @@ MEMBERS: dict[str, Member] = {
 # armed via GET /_debug/simulate and consumed by the very next request.
 SESSIONS: dict[str, dict] = {}
 
-_confirmation_counter = 100000
+# Sequential within a process for readability, but salted with the process start time so
+# confirmation numbers don't collide across separate server restarts -- otherwise the first
+# confirmation after any restart would always be identical (e.g. a discovery run's evidence
+# and a later replay run's evidence could both show the same number by coincidence).
+# Correctness note: safe only for a single worker process (the documented run command doesn't
+# pass --workers); a multi-worker deployment would need a shared counter, not a module global.
+_process_started_at = int(time.time())
+_confirmation_sequence = 0
 
 
 def create_session(username: str) -> str:
@@ -74,6 +82,6 @@ def destroy_session(session_id: str | None) -> None:
 
 
 def next_confirmation_number() -> str:
-    global _confirmation_counter
-    _confirmation_counter += 1
-    return f"CNF-{_confirmation_counter}"
+    global _confirmation_sequence
+    _confirmation_sequence += 1
+    return f"CNF-{_process_started_at}-{_confirmation_sequence:04d}"

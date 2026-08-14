@@ -1,0 +1,170 @@
+{
+  "artifact_schema_version": "1.0",
+  "capability_id": "mockbank.member_balance_lookup",
+  "version": "1.0.0",
+  "name": "Look up member savings and checking balance",
+  "description": "Searches for a member by ID and reads their savings balance, checking balance, and account status.",
+  "target": {
+    "app_id": "mockbank",
+    "surface_type": "web",
+    "base_url": "http://localhost:8000",
+    "vendor_product": "mockbank-core",
+    "tenant_id": null
+  },
+  "preconditions": {
+    "requires_capability": "mockbank.login",
+    "note": "Assumes an authenticated operator session. Login is its own reusable capability rather than duplicated in every flow, which also keeps per-tenant auth differences a one-place change."
+  },
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "member_id": { "type": "string", "pattern": "^[0-9]{4,10}$", "description": "MockBank member id to search for." }
+    },
+    "required": ["member_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "status": { "type": "string", "enum": ["found", "not_found", "permission_denied"] },
+      "savings_balance": { "type": ["number", "null"] },
+      "checking_balance": { "type": ["number", "null"] },
+      "account_status": { "type": ["string", "null"] }
+    },
+    "required": ["status"]
+  },
+  "success_checkpoint": {
+    "type": "element_visible",
+    "target": {
+      "semantic_description": "Account Summary heading on the member detail page",
+      "locators": [
+        { "strategy": "role", "value": "heading[name='Account Summary']", "note": "Real <h2> tag -- stable across markup/branding changes even though the surrounding layout is nested tables." }
+      ]
+    },
+    "value": "visible",
+    "description": "The goal is only 'done' once this is true -- distinct from each step's own checkpoint, which only confirms that individual action worked."
+  },
+  "steps": [
+    {
+      "step_id": "s1",
+      "action": "navigate",
+      "params": { "url": "/search" },
+      "checkpoint": {
+        "type": "url_matches",
+        "value": "**/search"
+      },
+      "risk_level": "safe",
+      "idempotent": true
+    },
+    {
+      "step_id": "s2",
+      "action": "type",
+      "target": {
+        "semantic_description": "member ID search input",
+        "locators": [
+          { "strategy": "role", "value": "textbox[name='Member ID']", "note": "Primary: accessible name from the paired <label for>, stable across markup/branding changes." },
+          { "strategy": "css", "value": "#member_id", "note": "Fallback: present today but not guaranteed across tenants." }
+        ]
+      },
+      "params": { "text": "{{member_id}}" },
+      "checkpoint": {
+        "type": "element_value_equals",
+        "target": {
+          "semantic_description": "member ID search input",
+          "locators": [
+            { "strategy": "role", "value": "textbox[name='Member ID']" },
+            { "strategy": "css", "value": "#member_id" }
+          ]
+        },
+        "value": "{{member_id}}"
+      },
+      "risk_level": "safe",
+      "idempotent": true
+    },
+    {
+      "step_id": "s3",
+      "action": "click",
+      "target": {
+        "semantic_description": "Search submit button",
+        "locators": [
+          { "strategy": "role", "value": "button[name='Search']", "note": "Primary: accessible name from visible button text." },
+          { "strategy": "text", "value": "Search", "note": "Last resort: purely text-based, most brittle." }
+        ]
+      },
+      "params": {},
+      "checkpoint": {
+        "type": "url_matches",
+        "value": "**/member/{{member_id}}"
+      },
+      "risk_level": "safe",
+      "idempotent": true
+    },
+    {
+      "step_id": "s4",
+      "action": "extract",
+      "target": {
+        "semantic_description": "savings balance cell in account summary table",
+        "locators": [
+          { "strategy": "role", "value": "cell[name='Savings Balance value']", "note": "Primary: accessible name from the cell's aria-label -- stable even though the table itself is deeply nested." },
+          { "strategy": "css", "value": "#savings-balance-value", "note": "Fallback: present today but not guaranteed across tenants." }
+        ]
+      },
+      "params": {},
+      "output_binding": "savings_balance",
+      "risk_level": "safe",
+      "idempotent": true
+    },
+    {
+      "step_id": "s5",
+      "action": "extract",
+      "target": {
+        "semantic_description": "checking balance cell in account summary table",
+        "locators": [
+          { "strategy": "role", "value": "cell[name='Checking Balance value']" },
+          { "strategy": "css", "value": "#checking-balance-value" }
+        ]
+      },
+      "params": {},
+      "output_binding": "checking_balance",
+      "risk_level": "safe",
+      "idempotent": true
+    },
+    {
+      "step_id": "s6",
+      "action": "extract",
+      "target": {
+        "semantic_description": "account status cell in account summary table",
+        "locators": [
+          { "strategy": "role", "value": "cell[name='Account Status value']" },
+          { "strategy": "css", "value": "#account-status-value" }
+        ]
+      },
+      "params": {},
+      "output_binding": "account_status",
+      "risk_level": "safe",
+      "idempotent": true
+    }
+  ],
+  "error_handling": {
+    "business_outcomes": [
+      { "signal": { "type": "text_present", "value": "No member found" }, "outcome": "not_found" },
+      { "signal": { "type": "text_present", "value": "Access denied" }, "outcome": "permission_denied" }
+    ],
+    "recoverable": [
+      { "signal": { "type": "text_present", "value": "Service temporarily unavailable" }, "action": "retry", "max_attempts": 3, "backoff_ms": 1000 },
+      { "signal": { "type": "dialog_present", "value": "Terms Updated" }, "action": "dismiss_and_continue" },
+      { "signal": { "type": "redirected_to", "value": "**/login" }, "action": "reauthenticate_and_resume" }
+    ],
+    "hard_failure_default": "stop_and_escalate"
+  },
+  "safety": {
+    "risk_level": "read_only",
+    "requires_confirmation": false
+  },
+  "provenance": {
+    "discovered_by": "hand_written",
+    "discovery_run_id": "fixture-phase3-schema-validation",
+    "created_at": "2026-08-14T00:00:00Z",
+    "reviewed": true,
+    "note": "Hand-written to validate the artifact schema shape before the discovery agent exists (Section 8 build order, step 3) -- not the LLM-driven run ASSIGNMENT_ORIGINAL.md Section 4 requires. That run's artifact and evidence land in /evidence/ in a later phase."
+  }
+}

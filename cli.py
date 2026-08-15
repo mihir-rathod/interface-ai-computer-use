@@ -18,6 +18,7 @@ import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 from dotenv import load_dotenv
@@ -57,14 +58,35 @@ def ensure_operator_console(port: int) -> None:
     _operator_console_started = True
 
 
-def parse_params(pairs: list[str]) -> dict[str, str]:
-    params: dict[str, str] = {}
+def parse_params(pairs: list[str], input_schema: Any = None) -> dict[str, Any]:
+    """`input_schema` (replay only -- pass the artifact's) coerces each value according to its
+    *declared* type: replay's validate_input() correctly rejects a string against a "number" or
+    "boolean" input_schema type. Coercion is schema-driven, not a blind "does this look
+    numeric" heuristic -- member_id is deliberately a pattern-matched string, and guessing by
+    shape alone would silently turn "10001" into an int (or worse, drop a leading zero from an
+    id like "00123") wherever a value merely looks numeric. Discovery never passes a schema
+    here: its own parameterization (agent/recorder.py's _parameterize) matches a parameter's
+    literal value against recorded step text with `in`/`.replace()`, which requires a string.
+    """
+    params: dict[str, Any] = {}
     for pair in pairs:
         if "=" not in pair:
             raise SystemExit(f"--param must be key=value, got: {pair!r}")
         key, value = pair.split("=", 1)
-        params[key] = value
+        declared_type = input_schema.properties.get(key, {}).get("type") if input_schema else None
+        params[key] = _coerce_param(value, declared_type)
     return params
+
+
+def _coerce_param(value: str, declared_type: Any) -> Any:
+    types = declared_type if isinstance(declared_type, list) else [declared_type]
+    if "boolean" in types:
+        return value.lower() in ("true", "1", "yes")
+    if "integer" in types:
+        return int(value)
+    if "number" in types:
+        return float(value)
+    return value
 
 
 def build_safety_policy(base_url: str) -> SafetyPolicy:
@@ -147,7 +169,7 @@ def cmd_discover(args: argparse.Namespace) -> int:
 def cmd_replay(args: argparse.Namespace) -> int:
     load_dotenv()
     artifact = load_artifact_by_id(args.capability)
-    params = parse_params(args.param)
+    params = parse_params(args.param, input_schema=artifact.input_schema)
     evidence_dir = Path(args.evidence_dir) if args.evidence_dir else EVIDENCE_ROOT / _run_id("replay_run")
     logger = EvidenceLogger(evidence_dir)
     safety_policy = build_safety_policy(args.base_url)

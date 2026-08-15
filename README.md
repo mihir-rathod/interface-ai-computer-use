@@ -9,14 +9,11 @@ Built against **MockBank**, a small local FastAPI app with a deliberately legacy
 (nested tables, no test IDs, generic markup) standing in for a bank back-office system, per the
 take-home brief.
 
-> Status: the full vertical slice works end to end via `cli.py` -- goal -> real LLM-driven
-> discovery -> saved typed artifact -> deterministic replay (success, both business outcomes,
-> and recoverable conditions, all verified against a live run, not just tests) -> and now
-> escalation: a genuine hard failure pauses the run, hands the *same live browser session* to
-> a human through a bare operator console, and resumes once they've either fixed it manually or
-> approved an irreversible step -- verified end to end against a real MockBank run, not just
-> unit-level. This README is filled in incrementally as each phase lands -- see `/REPORT.md`
-> for the design write-up once complete.
+> Status: the full vertical slice works end to end via `cli.py`: goal -> real LLM-driven
+> discovery -> saved typed artifact -> deterministic replay -> human escalation, all verified
+> against live runs with evidence checked into `/evidence/`. Two capabilities: a read-only
+> lookup (LLM-discovered) and a state-changing one with a validation-error outcome and a
+> confirmation-gated irreversible step (hand-written). See `/REPORT.md` for the design write-up.
 
 ## Setup
 
@@ -112,6 +109,19 @@ uv run python cli.py replay --capability mockbank.member_balance_lookup --param 
 
 Add `--headed` to either command to watch the browser instead of running headless.
 
+A second, hand-written capability -- `mockbank.open_subaccount` -- covers what the read-only
+lookup above can't: a validation-error business outcome, and a genuine irreversible step (opening
+the account is final) gated on human confirmation:
+
+```bash
+# Stops cleanly at a validation_error business outcome -- never reaches the irreversible step.
+uv run python cli.py replay --capability mockbank.open_subaccount --param member_id=10002 --param account_type=savings --param initial_deposit=0
+
+# Reaches the irreversible "Confirm & Open Account" step, gets blocked (unconfirmed), and pauses
+# for a human -- see "Escalation / human handoff" below to approve it and watch it complete.
+uv run python cli.py replay --capability mockbank.open_subaccount --param member_id=10001 --param account_type=checking --param initial_deposit=300
+```
+
 ### Escalation / human handoff
 
 Both commands print an operator console URL (`http://127.0.0.1:8010/operator/<run>`) at
@@ -122,6 +132,12 @@ seeing, a form to perform an action manually (by element ref, with a confirm che
 irreversible steps), and a Resume button. The run is genuinely blocked waiting on that page, not
 polling -- visit the URL while a run is paused to see it live. Pass `--no-operator-console` to
 disable this and have a stuck run just fail immediately instead.
+
+`/evidence/replay_run_20260815T005612Z/` is a saved example of exactly this: `open_subaccount`
+paused at its confirmation gate (`interventions/001.json` has the reason, live screenshot, and
+full element list), a human approved the exact blocked action through the console
+(`log.jsonl` shows it as an `actor: "human"` action with `confirmed: true`), and the run resumed
+to a real completion.
 
 ## Repo layout
 

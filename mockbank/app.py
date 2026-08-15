@@ -160,9 +160,17 @@ async def search_submit(request: Request, member_id: str = Form(...)):
     return RedirectResponse(f"/member/{member_id}", status_code=303)
 
 
-def _member_or_none(member_id: str) -> data.Member | None:
+def _resolve_member(member_id: str) -> tuple[data.Member | None, str | None]:
+    """Returns (member, error_status). error_status is "not_found" or "permission_denied" when
+    member is None, else None -- callers must not collapse the two into a single "missing"
+    case (a real bug found via testing: several routes here used to do exactly that, always
+    reporting "not_found" even for a restricted member)."""
     member = data.MEMBERS.get(member_id)
-    return member if member and not member.restricted else None
+    if member is None:
+        return None, "not_found"
+    if member.restricted:
+        return None, "permission_denied"
+    return member, None
 
 
 @app.get("/member/{member_id}", response_class=HTMLResponse)
@@ -196,11 +204,11 @@ async def open_subaccount_form(request: Request, member_id: str):
     if early is not None:
         return early
 
-    member = _member_or_none(member_id)
+    member, error_status = _resolve_member(member_id)
     if member is None:
         return templates.TemplateResponse(
             request, "search.html",
-            {"result_status": "not_found", "searched_id": member_id, "show_terms_modal": show_modal, "modal_return_to": str(request.url)},
+            {"result_status": error_status, "searched_id": member_id, "show_terms_modal": show_modal, "modal_return_to": str(request.url)},
         )
     return templates.TemplateResponse(
         request, "open_subaccount.html",
@@ -220,11 +228,11 @@ async def open_subaccount_submit(
     if early is not None:
         return early
 
-    member = _member_or_none(member_id)
+    member, error_status = _resolve_member(member_id)
     if member is None:
         return templates.TemplateResponse(
             request, "search.html",
-            {"result_status": "not_found", "searched_id": member_id, "show_terms_modal": show_modal, "modal_return_to": str(request.url)},
+            {"result_status": error_status, "searched_id": member_id, "show_terms_modal": show_modal, "modal_return_to": str(request.url)},
         )
 
     error = None
@@ -266,11 +274,11 @@ async def open_subaccount_confirm_form(request: Request, member_id: str):
     if not pending or pending["member_id"] != member_id:
         return RedirectResponse(f"/member/{member_id}/open-subaccount", status_code=303)
 
-    member = _member_or_none(member_id)
+    member, error_status = _resolve_member(member_id)
     if member is None:
         return templates.TemplateResponse(
             request, "search.html",
-            {"result_status": "not_found", "searched_id": member_id, "show_terms_modal": show_modal, "modal_return_to": str(request.url)},
+            {"result_status": error_status, "searched_id": member_id, "show_terms_modal": show_modal, "modal_return_to": str(request.url)},
         )
     return templates.TemplateResponse(
         request, "confirm_subaccount.html",
@@ -295,12 +303,12 @@ async def open_subaccount_confirm_submit(request: Request, member_id: str, actio
         session["pending_subaccount"] = None
         return RedirectResponse(f"/member/{member_id}", status_code=303)
 
-    member = _member_or_none(member_id)
+    member, error_status = _resolve_member(member_id)
     session["pending_subaccount"] = None
     if member is None:
         return templates.TemplateResponse(
             request, "search.html",
-            {"result_status": "not_found", "searched_id": member_id, "show_terms_modal": show_modal, "modal_return_to": str(request.url)},
+            {"result_status": error_status, "searched_id": member_id, "show_terms_modal": show_modal, "modal_return_to": str(request.url)},
         )
 
     confirmation_number = data.next_confirmation_number()

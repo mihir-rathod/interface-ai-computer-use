@@ -38,9 +38,9 @@ rate limits apply (see REPORT.md for why Gemini over Anthropic).
 | `uv run python cli.py discover ...` | yes | yes |
 
 One test (`tests/test_discovery_live.py`) makes a real Gemini call to prove the discovery loop
-genuinely works end to end -- ASSIGNMENT_ORIGINAL.md Section 4's non-negotiable "the discovery
-run has to be real." It's the only test that isn't free/local, so it auto-skips (not fails)
-whenever `GEMINI_API_KEY` isn't set -- the other 72 tests are unaffected either way.
+genuinely works end to end against a live surface, not a mock. It's the only test that isn't
+free/local, so it auto-skips (not fails) whenever `GEMINI_API_KEY` isn't set -- the other tests
+are unaffected either way.
 
 ("no" for MockBank means you don't need to start it yourself -- the WebSurface tests spin up a
 real MockBank instance in-process on an OS-assigned free port for the duration of the test
@@ -51,8 +51,6 @@ Start MockBank in a separate terminal before `discover` or `replay`:
 ```bash
 uv run uvicorn mockbank.app:app --port 8000
 ```
-
-(Not port 5000 -- macOS's AirPlay Receiver squats on it by default.)
 
 MockBank has one hardcoded operator login (no self-registration -- see "What's mocked, and why"
 below): username `operator`, password `bankdemo123`. Both are dummy values checked into
@@ -132,7 +130,8 @@ disable this and have a stuck run just fail immediately instead.
 /surface          Surface abstraction: perceive()/act(), the aria-snapshot element-list parser,
                    and the locator fallback-chain resolver. WebSurface (Playwright) is the only
                    implementation; both discovery and replay drive a surface through this same
-                   interface (ASSIGNMENT_ORIGINAL.md 3.7's "seam").
+                   interface, the seam that would let a future desktop/legacy-web surface slot
+                   in without changing discovery or replay.
 /agent            LLM-driven discovery loop (decides what to do; acts through a Surface),
                    the Gemini client, and the capability catalog (agent/catalog.py -- the
                    human-authored contract each discovery run fills in)
@@ -149,11 +148,11 @@ cli.py            `discover` and `replay` commands -- see Demo path above
 
 ## What's mocked, and why
 
-- **No self-registration / sign-up.** MockBank stands in for the class of system
-  ASSIGNMENT_ORIGINAL.md Section 1 describes: "core banking screens, servicing tools, and admin
-  consoles" -- internal back-office software used by bank employees, not a customer-facing product.
-  Real systems like this provision accounts through IT/HR onboarding, not self-service sign-up, so a
-  register flow would be unrealistic rather than a missing feature. One hardcoded operator login
-  (`operator` / `bankdemo123`, both dummy values) stands in for that provisioning step. This also
-  keeps the login flow a single reusable `mockbank.login` capability with real credential handling
-  (Section 3.4: never persist real secrets) without building an unneeded user-management surface.
+- **No self-registration / sign-up.** MockBank stands in for internal back-office software used
+  by bank employees -- core banking screens, servicing tools, admin consoles -- not a
+  customer-facing product. Real systems like this provision accounts through IT/HR onboarding,
+  not self-service sign-up, so a register flow would be unrealistic rather than a missing
+  feature. One hardcoded operator login (`operator` / `bankdemo123`, both dummy values) stands
+  in for that provisioning step. This also keeps the login flow a single reusable
+  `mockbank.login` capability with real credential handling (never persisted, read from
+  environment) without building an unneeded user-management surface.

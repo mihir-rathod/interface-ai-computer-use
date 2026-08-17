@@ -227,6 +227,7 @@ class WebSurface(Surface):
             ref=action.ref,
             target=action.target.model_dump() if action.target else None,
             params=params,
+            confirmed=action.confirmed,
             success=result.success,
             resolved_target=result.resolved_target.model_dump() if result.resolved_target else None,
             resolved_strategy=result.resolved_strategy.value if result.resolved_strategy else None,

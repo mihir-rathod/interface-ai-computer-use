@@ -11,9 +11,10 @@ specifies the contract, an agent figures out the implementation -- not the other
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
+from agent.loop import DiscoveryResult, RecordedAction
 from artifacts_lib.schema import (
     ActionType,
     Artifact,
@@ -28,7 +29,6 @@ from artifacts_lib.schema import (
     Step,
     StepRiskLevel,
 )
-from agent.loop import DiscoveryResult, RecordedAction
 from safety.risk import RiskClassifier
 
 _risk_classifier = RiskClassifier()
@@ -126,7 +126,7 @@ def build_artifact(
         provenance=Provenance(
             discovered_by=discovered_by,
             discovery_run_id=discovery_run_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             reviewed=False,
             note="LLM-discovered; not yet human-reviewed.",
         ),

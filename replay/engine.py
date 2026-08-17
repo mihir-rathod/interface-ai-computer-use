@@ -15,10 +15,16 @@ read as the former (a real answer), not endlessly retried.
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from artifacts_lib.schema import ActionType, Artifact, RecoverableRule, RecoveryAction, Step
+from artifacts_lib.schema import (
+    ActionType,
+    Artifact,
+    RecoverableRule,
+    RecoveryAction,
+    Step,
+)
 from artifacts_lib.storage import DEFAULT_ARTIFACTS_DIR, load_artifact_by_id
 from escalation.session_manager import SessionManager
 from evidence_lib.logger import EvidenceLogger
@@ -69,13 +75,13 @@ class ReplayEngine:
         self.session_manager = session_manager
 
     def run(self, artifact: Artifact, inputs: dict[str, Any]) -> ReplayResult:
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         input_errors = validate_input(artifact.input_schema, inputs)
         if input_errors:
             return self._finish(artifact, started_at, ReplayResult(
                 status=ReplayStatus.HARD_FAILURE, capability_id=artifact.capability_id,
                 error=ReplayError(message="; ".join(input_errors)),
-                started_at=started_at, finished_at=datetime.now(timezone.utc),
+                started_at=started_at, finished_at=datetime.now(UTC),
             ))
 
         variables = dict(inputs)
@@ -90,7 +96,7 @@ class ReplayEngine:
                     return self._finish(artifact, started_at, ReplayResult(
                         status=ReplayStatus.HARD_FAILURE, capability_id=artifact.capability_id,
                         error=ReplayError(message="exceeded max artifact restarts after reauthentication"),
-                        started_at=started_at, finished_at=datetime.now(timezone.utc),
+                        started_at=started_at, finished_at=datetime.now(UTC),
                     ))
                 continue
             except _BusinessOutcome as bo:
@@ -99,20 +105,20 @@ class ReplayEngine:
                     business_outcome=bo.outcome,
                     outputs=self._build_business_outputs(artifact, bo.outcome, bo.output_field),
                     steps_completed=bo.steps_completed,
-                    started_at=started_at, finished_at=datetime.now(timezone.utc),
+                    started_at=started_at, finished_at=datetime.now(UTC),
                 ))
             except _HardFailure as hf:
                 return self._finish(artifact, started_at, ReplayResult(
                     status=ReplayStatus.HARD_FAILURE, capability_id=artifact.capability_id,
                     error=hf.error, steps_completed=hf.steps_completed,
-                    started_at=started_at, finished_at=datetime.now(timezone.utc),
+                    started_at=started_at, finished_at=datetime.now(UTC),
                 ))
 
         final_outputs = {**artifact.success_output_defaults, **outputs}
         return self._finish(artifact, started_at, ReplayResult(
             status=ReplayStatus.SUCCESS, capability_id=artifact.capability_id,
             outputs=final_outputs, steps_completed=completed,
-            started_at=started_at, finished_at=datetime.now(timezone.utc),
+            started_at=started_at, finished_at=datetime.now(UTC),
         ))
 
     # ---- step loop --------------------------------------------------------------------

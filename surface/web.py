@@ -19,9 +19,8 @@ from urllib.parse import urljoin, urlsplit
 
 from playwright.sync_api import Page
 
-from artifacts_lib.schema import ActionType
+from artifacts_lib.schema import ActionType, LocatorStrategy, Signal, SignalType, Target
 from artifacts_lib.schema import Locator as SchemaLocator
-from artifacts_lib.schema import LocatorStrategy, Signal, SignalType, Target
 from evidence_lib.logger import EvidenceLogger
 from evidence_lib.redaction import redact_type_params
 from safety.policy import SafetyPolicy

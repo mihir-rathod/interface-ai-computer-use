@@ -18,7 +18,7 @@ import json
 import queue
 import threading
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -71,7 +71,7 @@ class SessionManager:
         self.current_step_id: str | None = None
         self.latest_observed: ObservedState | None = None
 
-        self._command_queue: "queue.Queue[HumanCommand]" = queue.Queue()
+        self._command_queue: queue.Queue[HumanCommand] = queue.Queue()
         self._resume_event = threading.Event()
         self._lock = threading.Lock()
 
@@ -149,7 +149,7 @@ class SessionManager:
             step_id=step_id,
             screenshot_path=screenshot,
             observed_state_text=self.latest_observed.to_prompt_text() if self.latest_observed else None,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         interventions_dir = self.evidence_dir / "interventions"
         interventions_dir.mkdir(parents=True, exist_ok=True)

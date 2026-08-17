@@ -66,7 +66,7 @@ def test_act_endpoint_enqueues_and_executes_on_pausing_thread(tmp_path):
 
 
 def test_resume_endpoint_releases_the_paused_thread(tmp_path):
-    manager, _, thread = _paused_session(tmp_path, "sess-resume")
+    _manager, _, thread = _paused_session(tmp_path, "sess-resume")
     try:
         assert thread.is_alive()
         resp = client.post("/operator/sess-resume/resume", follow_redirects=False)

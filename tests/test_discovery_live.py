@@ -13,7 +13,14 @@ import pytest
 from agent.gemini_client import GeminiClient
 from agent.loop import DiscoveryLoop
 from agent.recorder import build_artifact
-from artifacts_lib.schema import CapabilityTarget, ErrorHandling, JSONSchemaObject, SafetyMeta, Signal, SignalType
+from artifacts_lib.schema import (
+    CapabilityTarget,
+    ErrorHandling,
+    JSONSchemaObject,
+    SafetyMeta,
+    Signal,
+    SignalType,
+)
 from replay.engine import ReplayEngine
 from replay.result import ReplayStatus
 from surface.web import WebSurface

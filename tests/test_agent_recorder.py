@@ -73,16 +73,16 @@ def test_synthesize_checkpoint_extract_gets_none():
 
 
 def _artifact_kwargs(**overrides):
-    base = dict(
-        capability_id="mockbank.test_lookup", version="1.0.0", name="Test lookup", description="test",
-        target=CapabilityTarget(app_id="mockbank", surface_type="web", base_url="http://x", vendor_product="mockbank-core"),
-        input_schema=JSONSchemaObject(properties={"member_id": {"type": "string"}}, required=["member_id"]),
-        output_schema=JSONSchemaObject(properties={"savings_balance": {"type": "number"}}, required=[]),
-        success_checkpoint=Signal(type=SignalType.TEXT_PRESENT, value="Account Summary"),
-        error_handling=ErrorHandling(),
-        safety=SafetyMeta(risk_level="read_only"),
-        discovered_by="test-model", discovery_run_id="run-1",
-    )
+    base = {
+        "capability_id": "mockbank.test_lookup", "version": "1.0.0", "name": "Test lookup", "description": "test",
+        "target": CapabilityTarget(app_id="mockbank", surface_type="web", base_url="http://x", vendor_product="mockbank-core"),
+        "input_schema": JSONSchemaObject(properties={"member_id": {"type": "string"}}, required=["member_id"]),
+        "output_schema": JSONSchemaObject(properties={"savings_balance": {"type": "number"}}, required=[]),
+        "success_checkpoint": Signal(type=SignalType.TEXT_PRESENT, value="Account Summary"),
+        "error_handling": ErrorHandling(),
+        "safety": SafetyMeta(risk_level="read_only"),
+        "discovered_by": "test-model", "discovery_run_id": "run-1",
+    }
     base.update(overrides)
     return base
 

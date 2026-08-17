@@ -26,7 +26,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 # --------------------------------------------------------------------------------------
 # Locating elements -- the single mechanism used for both acting and checking.
 # --------------------------------------------------------------------------------------
@@ -95,7 +94,7 @@ class Signal(BaseModel):
     description: str | None = None
 
     @model_validator(mode="after")
-    def target_required_for_element_signals(self) -> "Signal":
+    def target_required_for_element_signals(self) -> Signal:
         needs_target = self.type in _ELEMENT_SIGNAL_TYPES
         if needs_target and self.target is None:
             raise ValueError(f"signal type '{self.type}' requires a target")
@@ -152,7 +151,7 @@ class Step(BaseModel):
     )
 
     @model_validator(mode="after")
-    def action_requirements(self) -> "Step":
+    def action_requirements(self) -> Step:
         if self.action in _TARGET_REQUIRED_ACTIONS and self.target is None:
             raise ValueError(f"action '{self.action}' requires a target")
         if self.action == ActionType.EXTRACT and not self.output_binding:
@@ -211,7 +210,7 @@ class JSONSchemaObject(BaseModel):
     required: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def required_fields_are_declared(self) -> "JSONSchemaObject":
+    def required_fields_are_declared(self) -> JSONSchemaObject:
         unknown = set(self.required) - set(self.properties.keys())
         if unknown:
             raise ValueError(f"required field(s) {sorted(unknown)} not present in properties")
@@ -254,13 +253,13 @@ class RecoverableRule(BaseModel):
     )
 
     @model_validator(mode="after")
-    def retry_bounds(self) -> "RecoverableRule":
+    def retry_bounds(self) -> RecoverableRule:
         if self.action == RecoveryAction.RETRY and self.max_attempts < 1:
             raise ValueError("retry action requires max_attempts >= 1")
         return self
 
     @model_validator(mode="after")
-    def recovery_target_matches_action(self) -> "RecoverableRule":
+    def recovery_target_matches_action(self) -> RecoverableRule:
         needs_target = self.action == RecoveryAction.DISMISS_AND_CONTINUE
         if needs_target and self.recovery_target is None:
             raise ValueError("dismiss_and_continue requires recovery_target")
@@ -357,7 +356,7 @@ class Artifact(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def steps_non_empty_with_unique_ids(self) -> "Artifact":
+    def steps_non_empty_with_unique_ids(self) -> Artifact:
         if not self.steps:
             raise ValueError("artifact must have at least one step")
         ids = [s.step_id for s in self.steps]
@@ -367,7 +366,7 @@ class Artifact(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def output_fields_are_declared(self) -> "Artifact":
+    def output_fields_are_declared(self) -> Artifact:
         bound = {s.output_binding for s in self.steps if s.output_binding}
         bound |= {r.output_field for r in self.error_handling.business_outcomes}
         bound |= set(self.success_output_defaults.keys())

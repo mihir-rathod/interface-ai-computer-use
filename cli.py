@@ -16,7 +16,7 @@ import json
 import os
 import sys
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +35,7 @@ from escalation.session_manager import SessionManager
 from evidence_lib.logger import EvidenceLogger
 from replay.engine import ReplayEngine
 from replay.result import ReplayStatus
-from safety.allowlist import AllowlistConfig, AllowlistPolicy, DEFAULT_ALLOWLIST_PATH
+from safety.allowlist import DEFAULT_ALLOWLIST_PATH, AllowlistConfig, AllowlistPolicy
 from safety.policy import SafetyPolicy
 from surface.web import WebSurface
 
@@ -106,7 +106,7 @@ def run_login(surface: WebSurface, username: str, password: str) -> None:
 
 
 def _run_id(prefix: str) -> str:
-    return f"{prefix}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    return f"{prefix}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
 
 
 def cmd_discover(args: argparse.Namespace) -> int:

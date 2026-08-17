@@ -11,8 +11,8 @@ import threading
 import time
 
 from artifacts_lib.schema import ActionType, Artifact
-from evidence_lib.logger import EvidenceLogger
 from escalation.session_manager import SessionManager, SessionMode
+from evidence_lib.logger import EvidenceLogger
 from replay.engine import ReplayEngine
 from replay.result import ReplayStatus
 from surface.base import Action

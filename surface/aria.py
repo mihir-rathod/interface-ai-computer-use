@@ -40,7 +40,7 @@ class _RawNode:
     ref: str | None
     value: str | None
     attrs: dict[str, str]
-    children: list["_RawNode"] = field(default_factory=list)
+    children: list[_RawNode] = field(default_factory=list)
 
 
 def _parse_tree(snapshot_text: str) -> list[_RawNode]:

@@ -30,7 +30,7 @@ class AllowlistConfig(BaseModel):
     allowed_action_types: list[str] = Field(default_factory=list)
 
     @classmethod
-    def from_json(cls, path: Path = DEFAULT_ALLOWLIST_PATH) -> "AllowlistConfig":
+    def from_json(cls, path: Path = DEFAULT_ALLOWLIST_PATH) -> AllowlistConfig:
         return cls.model_validate_json(path.read_text())
 
 

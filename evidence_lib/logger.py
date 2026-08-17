@@ -9,7 +9,7 @@ import json
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 
 @dataclass
@@ -35,7 +35,7 @@ class EvidenceLogger:
     def close(self) -> None:
         self._fh.close()
 
-    def __enter__(self) -> "EvidenceLogger":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc: object) -> None:
